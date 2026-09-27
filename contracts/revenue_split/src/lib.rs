@@ -670,9 +670,10 @@ impl RevenueSplitContract {
     ///
     /// ### Algorithm: Basis Points Distribution
     /// - Each recipient receives a portion calculated as: `(amount * basis_points) / 10000`.
-    /// - **Precision Management**: To ensure 100% of the funds are distributed and avoid
-    ///   "dust" remaining in the sender's account due to rounding, the final recipient
-    ///   in the list automatically absorbs any remainders.
+    /// - **Precision & Security**: Each recipient receives strictly their floor-rounded share.
+    ///   To prevent gameable dust-siphoning exploits (where a final recipient with minimal basis
+    ///   points absorbs remainder dust from micro-transactions at scale), any division remainder
+    ///   is NOT absorbed by the final recipient; instead it remains safely in the sender's account.
     ///
     /// ### Requirements
     /// - `from` must authorize the transaction.
@@ -1103,8 +1104,8 @@ impl RevenueSplitContract {
 
     /// Internal helper to calculate the distribution of an amount across recipients.
     ///
-    /// The final recipient absorbs any rounding remainder to ensure 100% of
-    /// the funds are distributed.
+    /// Every recipient receives strictly floor((amount * basis_points) / 10000).
+    /// Undistributed remainder dust is retained by the sender to prevent dust-siphoning attacks.
     fn build_distribution_preview(
         env: &Env,
         shares: &Vec<RecipientShare>,
