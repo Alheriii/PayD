@@ -2,6 +2,7 @@ import { Icon } from '@stellar/design-system';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
+import SecurityAuditBadges from '../components/SecurityAuditBadges';
 
 interface DashboardWidgetData {
   payments: {
@@ -306,6 +307,8 @@ export default function Home() {
             </>
           )}
         </section>
+
+        <SecurityAuditBadges />
       </div>
     </main>
   );
