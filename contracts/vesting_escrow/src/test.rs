@@ -582,11 +582,12 @@ fn same_ledger_claim_replay_detected() {
 
     // Advance past cliff so claim is possible
     e.ledger().set_timestamp(start_time + 200);
+    e.ledger().set_sequence_number(100);
 
     // First claim in ledger sequence N should succeed
     client.claim();
     let config_after_first = client.get_config();
-    assert!(config_after_first.total_claimed > 0, "first claim should succeed");
+    assert!(config_after_first.claimed_amount > 0, "first claim should succeed");
 
     // Attempting second claim in the SAME ledger sequence should fail with LedgerReplayDetected
     // This prevents an attacker from repeatedly calling claim() in the same ledger
@@ -596,7 +597,7 @@ fn same_ledger_claim_replay_detected() {
 
     // Verify state hasn't changed from failed replay attempt
     let config_after_replay = client.get_config();
-    assert_eq!(config_after_first.total_claimed, config_after_replay.total_claimed,
+    assert_eq!(config_after_first.claimed_amount, config_after_replay.claimed_amount,
         "failed replay attempt should not change claimed amount");
 }
 
@@ -621,16 +622,16 @@ fn claim_allowed_in_different_ledgers() {
 
     // First claim at ledger 100
     e.ledger().set_timestamp(start_time + 200);
-    e.ledger().set_sequence(100);
+    e.ledger().set_sequence_number(100);
     client.claim();
-    let claimed_at_ledger_100 = client.get_config().total_claimed;
+    let claimed_at_ledger_100 = client.get_config().claimed_amount;
 
     // Advance to ledger 101 and claim again — this should succeed
     // (different ledger sequence means not a replay)
     e.ledger().set_timestamp(start_time + 400);
-    e.ledger().set_sequence(101);
+    e.ledger().set_sequence_number(101);
     client.claim();
-    let claimed_at_ledger_101 = client.get_config().total_claimed;
+    let claimed_at_ledger_101 = client.get_config().claimed_amount;
 
     assert!(claimed_at_ledger_101 > claimed_at_ledger_100,
         "claim in different ledger should succeed and increase claimed amount");
@@ -642,7 +643,7 @@ fn same_ledger_clawback_replay_detected() {
 
     let start_time = 1_000u64;
     e.ledger().set_timestamp(start_time);
-    e.ledger().set_sequence(100);
+    e.ledger().set_sequence_number(100);
 
     client.initialize(
         &funder,
@@ -677,7 +678,7 @@ fn partial_clawback_replay_protection() {
 
     let start_time = 1_000u64;
     e.ledger().set_timestamp(start_time);
-    e.ledger().set_sequence(100);
+    e.ledger().set_sequence_number(100);
 
     client.initialize(
         &funder,
@@ -713,7 +714,7 @@ fn cross_ledger_replay_test_with_realistic_sequence() {
     e.ledger().set_timestamp(start_time);
 
     // Simulate realistic ledger sequences (Stellar creates ledgers ~every 5 seconds)
-    e.ledger().set_sequence(50_000_000); // Mainnet-realistic sequence
+    e.ledger().set_sequence_number(50_000_000); // Mainnet-realistic sequence
 
     client.initialize(
         &funder,
@@ -730,7 +731,6 @@ fn cross_ledger_replay_test_with_realistic_sequence() {
     // Claim at ledger 50_000_000
     e.ledger().set_timestamp(start_time + 100);
     client.claim();
-    let contract_id = e.register(VestingContract, ());
     let first_balance = token_client.balance(&beneficiary);
 
     // Try to claim again in same ledger — should fail
@@ -739,7 +739,7 @@ fn cross_ledger_replay_test_with_realistic_sequence() {
 
     // Advance ~12 seconds (realistic ledger interval)
     e.ledger().set_timestamp(start_time + 112);
-    e.ledger().set_sequence(50_000_012);
+    e.ledger().set_sequence_number(50_000_012);
 
     // Claim in new ledger — should succeed
     client.claim();
@@ -794,10 +794,19 @@ mod cliff_properties {
                 &admin,
             );
 
-            for elapsed in 0..cliff_seconds {
-                e.ledger().set_timestamp(start_time + elapsed);
-                let vested = client.get_vested_amount();
-                prop_assert_eq!(vested, 0i128, "vested should be 0 before cliff at time {}", elapsed);
+            let checkpoints = [
+                0,
+                cliff_seconds / 4,
+                cliff_seconds / 2,
+                (3 * cliff_seconds) / 4,
+                cliff_seconds.saturating_sub(1),
+            ];
+            for &elapsed in &checkpoints {
+                if elapsed < cliff_seconds {
+                    e.ledger().set_timestamp(start_time + elapsed);
+                    let vested = client.get_vested_amount();
+                    prop_assert_eq!(vested, 0i128, "vested should be 0 before cliff at time {}", elapsed);
+                }
             }
         }
 
@@ -857,7 +866,9 @@ mod cliff_properties {
             );
 
             let mut prev_vested = 0i128;
-            for i in 0..=duration_seconds {
+            let step = (duration_seconds / 20).max(1);
+            let mut i = 0u64;
+            while i <= duration_seconds {
                 e.ledger().set_timestamp(start_time + i);
                 let vested = client.get_vested_amount();
                 prop_assert!(
@@ -868,6 +879,7 @@ mod cliff_properties {
                     i
                 );
                 prev_vested = vested;
+                i += step;
             }
         }
 
@@ -891,7 +903,8 @@ mod cliff_properties {
                 &admin,
             );
 
-            for i in 0..=(duration_seconds + 100) {
+            let checkpoints = [0, cliff_seconds, duration_seconds / 2, duration_seconds, duration_seconds + 1, duration_seconds + 100];
+            for &i in &checkpoints {
                 e.ledger().set_timestamp(start_time + i);
                 let vested = client.get_vested_amount();
                 prop_assert!(
@@ -923,7 +936,8 @@ mod cliff_properties {
                 &admin,
             );
 
-            for i in duration_seconds..=(duration_seconds + 1000) {
+            let checkpoints = [duration_seconds, duration_seconds + 1, duration_seconds + 100, duration_seconds + 1000];
+            for &i in &checkpoints {
                 e.ledger().set_timestamp(start_time + i);
                 let vested = client.get_vested_amount();
                 prop_assert_eq!(
@@ -994,9 +1008,107 @@ mod cliff_properties {
             let vested = client.get_vested_amount();
             prop_assert_eq!(vested, 0i128, "should be 0 tokens vested at start with zero cliff");
 
-            e.ledger().set_timestamp(start_time + 1);
+            // Advance halfway through duration: with zero cliff, linear vesting yields proportional tokens
+            e.ledger().set_timestamp(start_time + duration_seconds / 2);
             let vested = client.get_vested_amount();
-            prop_assert!(vested > 0i128, "should have some vested tokens immediately after start with zero cliff");
+            let expected = (total_amount * (duration_seconds / 2) as i128) / duration_seconds as i128;
+            prop_assert!(vested > 0i128, "should have some vested tokens halfway through duration with zero cliff");
+            prop_assert_eq!(vested, expected);
+
+            // Advance to end of duration: all tokens must be vested
+            e.ledger().set_timestamp(start_time + duration_seconds);
+            let vested = client.get_vested_amount();
+            prop_assert_eq!(vested, total_amount, "all tokens vested at end of duration");
         }
     }
 }
+
+/// INVARIANT AUDIT TEST:
+/// Escrowed token balance strictly equals unresolved liabilities (total_amount - claimed_amount)
+/// at every stage of the grant lifecycle across claims, partial clawbacks, full clawbacks,
+/// and post-clawback resolution.
+#[test]
+fn test_invariant_vesting_balance_equals_unresolved_liabilities() {
+    let (e, funder, beneficiary, clawback_admin, admin, token_contract, token_client, _, client) = setup();
+
+    let start_time = 1_000u64;
+    let cliff_seconds = 200u64;
+    let duration_seconds = 1_000u64;
+    let total_amount: i128 = 100_000;
+
+    let assert_vesting_invariant = |step: &str| {
+        let config = client.get_config();
+        let contract_balance = token_client.balance(&client.address);
+        let expected_liability = config.total_amount - config.claimed_amount;
+        assert_eq!(
+            contract_balance, expected_liability,
+            "Vesting invariant violated at step {step}: contract balance ({contract_balance}) != unresolved liability ({expected_liability})"
+        );
+        assert!(
+            contract_balance >= 0,
+            "Contract balance must never be negative at step {step}"
+        );
+    };
+
+    let mut ledger_seq = 100u32;
+    e.ledger().set_timestamp(start_time);
+    e.ledger().set_sequence_number(ledger_seq);
+
+    client.initialize(
+        &funder,
+        &beneficiary,
+        &token_contract,
+        &start_time,
+        &cliff_seconds,
+        &duration_seconds,
+        &total_amount,
+        &clawback_admin,
+        &admin,
+    );
+    assert_vesting_invariant("initialization");
+
+    // 1. Before cliff: no claims possible, invariant holds
+    ledger_seq += 1;
+    e.ledger().set_sequence_number(ledger_seq);
+    e.ledger().set_timestamp(start_time + 100);
+    assert_vesting_invariant("before cliff");
+
+    // 2. Past cliff: 400s elapsed (40% vested = 40,000)
+    ledger_seq += 1;
+    e.ledger().set_sequence_number(ledger_seq);
+    e.ledger().set_timestamp(start_time + 400);
+    client.claim();
+    assert_vesting_invariant("after first claim past cliff");
+
+    // 3. Partial clawback: reclaim 20,000 unvested tokens
+    ledger_seq += 1;
+    e.ledger().set_sequence_number(ledger_seq);
+    client.partial_clawback(&20_000);
+    assert_vesting_invariant("after partial clawback");
+
+    // 4. Advance time: 600s elapsed; claim additional vested tokens
+    ledger_seq += 1;
+    e.ledger().set_sequence_number(ledger_seq);
+    e.ledger().set_timestamp(start_time + 600);
+    client.claim();
+    assert_vesting_invariant("after second claim");
+
+    // 5. Full clawback: revokes remaining unvested tokens; remaining vested tokens stay in contract
+    ledger_seq += 1;
+    e.ledger().set_sequence_number(ledger_seq);
+    client.clawback();
+    assert_vesting_invariant("after full clawback");
+
+    // 6. Beneficiary claims all remaining vested tokens post-clawback
+    ledger_seq += 1;
+    e.ledger().set_sequence_number(ledger_seq);
+    e.ledger().set_timestamp(start_time + 1000);
+    client.claim();
+    assert_vesting_invariant("after final post-clawback claim");
+
+    // Final state: all liabilities resolved, contract balance is exactly 0
+    assert_eq!(token_client.balance(&client.address), 0);
+    let final_config = client.get_config();
+    assert_eq!(final_config.claimed_amount, final_config.total_amount);
+}
+

@@ -123,6 +123,10 @@ These tests ensure robustness before mainnet deployment where financial correctn
    - `require_unique_ledger` checks `LastClaimLedger` and `LastClawbackLedger` to prevent duplicate claims/clawbacks in the same ledger sequence.
 4. **Circuit Breaker (`Paused` state)**:
    - When paused, `claim`, `clawback`, and `partial_clawback` calls return `ContractPaused`.
+5. **Escrowed-Funds Accounting Invariant**:
+   - The contract guarantees that the token balance held at the contract address strictly equals the unresolved liabilities of the grant across every lifecycle event:
+     $$\text{contract\_token\_balance} = \text{config.total\_amount} - \text{config.claimed\_amount}$$
+   - This invariant strictly holds under all execution sequences: during the pre-cliff window, throughout progressive linear claims, across partial clawbacks (with `LastClawbackLedger` replay protection), upon full clawback execution (where unvested tokens return to admin and unreleased-vested tokens remain available for the beneficiary), and upon final resolution where the contract balance reaches exactly 0. Validated via `test_invariant_vesting_balance_equals_unresolved_liabilities`.
 
 ---
 

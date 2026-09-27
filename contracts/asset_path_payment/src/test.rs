@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::testutils::{Address as _, Events as _};
+use soroban_sdk::testutils::{Address as _, Events as _, Ledger as _};
 use soroban_sdk::{Env, String, TryFromVal, token};
 
 fn create_token_contract(env: &Env, admin: &Address) -> Address {
@@ -1496,7 +1496,7 @@ fn same_ledger_initiate_path_payment_replay_detected() {
     let client = AssetPathPaymentContractClient::new(&env, &contract_id);
     client.init(&admin);
 
-    env.ledger().set_sequence(100);
+    env.ledger().set_sequence_number(100);
 
     // First initiate in ledger 100 should succeed
     let id1 = client.initiate_path_payment(
@@ -1544,7 +1544,7 @@ fn initiate_path_payment_allowed_in_different_ledgers() {
     client.init(&admin);
 
     // Initiate at ledger 100
-    env.ledger().set_sequence(100);
+    env.ledger().set_sequence_number(100);
     let id1 = client.initiate_path_payment(
         &from,
         &to,
@@ -1558,7 +1558,7 @@ fn initiate_path_payment_allowed_in_different_ledgers() {
     assert_eq!(id1, 1);
 
     // Initiate from same sender at ledger 101 — should succeed (different ledger)
-    env.ledger().set_sequence(101);
+    env.ledger().set_sequence_number(101);
     let id2 = client.initiate_path_payment(
         &from,
         &to,
@@ -1595,7 +1595,7 @@ fn different_senders_can_initiate_in_same_ledger() {
     let client = AssetPathPaymentContractClient::new(&env, &contract_id);
     client.init(&admin);
 
-    env.ledger().set_sequence(100);
+    env.ledger().set_sequence_number(100);
 
     // Both from1 and from2 can initiate in the same ledger (different senders)
     let id1 = client.initiate_path_payment(
