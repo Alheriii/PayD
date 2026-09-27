@@ -53,7 +53,10 @@
     "card2Title": "Plantilla global",
     "card2Body": "Incorpora a cualquier persona, en cualquier lugar. Paga en USDC, XLM o stablecoins locales.",
     "card3Title": "Auditoría en cadena",
-    "card3Body": "Transparencia total. Cada transacción es inmutable y verificable en el ledger."
+    "card3Body": "Transparencia total. Cada transacción es inmutable y verificable en el ledger.",
+    "card1Link": "Abrir nómina",
+    "card2Link": "Gestionar empleados",
+    "card3Link": "Ver transacciones"
   },
   "securityAudits": {
     "eyebrow": "Seguridad en mainnet",
