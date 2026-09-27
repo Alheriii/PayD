@@ -85,9 +85,25 @@ describe('ThemeProvider', () => {
     expect(document.documentElement.getAttribute('data-org-name')).toBe('Acme Corp');
     expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('#ff0055');
 
+    expect(document.documentElement.style.getPropertyValue('--brand-on-primary')).toBe('#ffffff');
+
     await user.click(screen.getByRole('button', { name: /reset-brand/i }));
     expect(screen.getByTestId('org-name')).toHaveTextContent('none');
     expect(document.documentElement.getAttribute('data-org-name')).toBeNull();
     expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('');
+  });
+
+  test('ignores non-hex brand colours instead of writing them into CSS', () => {
+    localStorage.setItem(
+      'payd-org-brand',
+      JSON.stringify({ primaryColor: 'red; background:url(x)', accentColor: '#14b8a6' })
+    );
+    render(
+      <ThemeProvider>
+        <BrandProbe />
+      </ThemeProvider>
+    );
+    expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--brand-accent')).toBe('#14b8a6');
   });
 });
