@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import app from './app.js';
 import logger from './utils/logger.js';
 import config from './config/index.js';
+import { initializeConfig } from './config/env.js';
 import { assertJwtSecretsSecure } from './utils/jwtSecurity.js';
 import { initializeSocket } from './services/socketService.js';
 import { startWorkers, stopWorkers } from './workers/index.js';
@@ -19,24 +20,45 @@ export const setShuttingDown = (value: boolean) => {
   isShuttingDown = value;
 };
 
-assertJwtSecretsSecure({
-  JWT_SECRET: process.env.JWT_SECRET,
-  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
-});
+async function startServer() {
+  try {
+    // Load secrets from configured provider (env or AWS Secrets Manager)
+    await initializeConfig();
+  } catch (error) {
+    logger.error('Failed to initialize configuration:', error);
+    process.exit(1);
+  }
 
-const server = createServer(app);
+  assertJwtSecretsSecure({
+    JWT_SECRET: process.env.JWT_SECRET,
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+  });
 
-initializeSocket(server);
+  const server = createServer(app);
 
-startWorkers();
+  initializeSocket(server);
 
-const PORT = config.port || process.env.PORT || 4000;
+  startWorkers();
 
-server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  logger.info(`Environment: ${config.nodeEnv}`);
-  logger.info(`Health check: http://localhost:${PORT}/health}`);
-  logger.info(`Contract registry: http://localhost:${PORT}/api/contracts`);
+  const PORT = config.port || process.env.PORT || 4000;
+
+  server.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Environment: ${config.nodeEnv}`);
+    logger.info(`Health check: http://localhost:${PORT}/health}`);
+    logger.info(`Contract registry: http://localhost:${PORT}/api/contracts`);
+  });
+
+  return server;
+}
+
+let server: any;
+
+serverPromise.then((s: any) => {
+  server = s;
+}).catch((error: any) => {
+  logger.error('Failed to start server:', error);
+  process.exit(1);
 });
 
 // Graceful shutdown state
@@ -65,12 +87,14 @@ const shutdown = async (signal: string) => {
   try {
     // Step 1: Stop accepting new HTTP connections
     logger.info('Step 1/6: Closing HTTP server (draining existing connections)...');
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => {
-        if (err) reject(err);
-        else resolve();
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
-    });
+    }
     logger.info('HTTP server closed', { elapsedMs: Date.now() - shutdownStart });
 
     // Step 2: Stop BullMQ workers (finish current jobs)
