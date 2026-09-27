@@ -1,13 +1,14 @@
 import React, { useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { Theme, ThemeContext, OrgBrandConfig } from '../hooks/useTheme';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { normalizeHexColor, readableTextOn, sanitizeOrgName } from '../utils/brand';
 
 const STORAGE_KEY = 'payd-theme';
 const BRAND_STORAGE_KEY = 'payd-org-brand';
 
 function readStoredTheme(): Theme {
   const saved = localStorage.getItem(STORAGE_KEY);
-  return saved === 'light' || saved === 'dark' ? saved : 'dark';
+  return saved === 'light' || saved === 'dark' ? saved : 'light';
 }
 
 function isOrgBrandConfig(value: unknown): value is OrgBrandConfig {
@@ -38,28 +39,25 @@ function persistTheme(next: Theme) {
   localStorage.setItem(STORAGE_KEY, next);
 }
 
+function setOrRemove(root: HTMLElement, prop: string, value: string | null) {
+  if (value) root.style.setProperty(prop, value);
+  else root.style.removeProperty(prop);
+}
+
 function applyBrandTheme(brand: OrgBrandConfig) {
   const root = document.documentElement;
-  if (brand.primaryColor) {
-    root.style.setProperty('--brand-primary', brand.primaryColor);
-  } else {
-    root.style.removeProperty('--brand-primary');
-  }
+  // Validate org-supplied values before they reach CSS (#1505): only hex
+  // colours are applied, anything else falls back to the default tokens.
+  const primary = normalizeHexColor(brand.primaryColor);
+  setOrRemove(root, '--brand-primary', primary);
+  // Text/icons on a solid brand fill keep AA contrast whatever the colour.
+  setOrRemove(root, '--brand-on-primary', primary ? readableTextOn(primary) : null);
+  setOrRemove(root, '--brand-accent', normalizeHexColor(brand.accentColor));
+  setOrRemove(root, '--brand-header-bg', normalizeHexColor(brand.headerBg));
 
-  if (brand.accentColor) {
-    root.style.setProperty('--brand-accent', brand.accentColor);
-  } else {
-    root.style.removeProperty('--brand-accent');
-  }
-
-  if (brand.headerBg) {
-    root.style.setProperty('--brand-header-bg', brand.headerBg);
-  } else {
-    root.style.removeProperty('--brand-header-bg');
-  }
-
-  if (brand.orgName) {
-    root.setAttribute('data-org-name', brand.orgName);
+  const orgName = sanitizeOrgName(brand.orgName);
+  if (orgName) {
+    root.setAttribute('data-org-name', orgName);
   } else {
     root.removeAttribute('data-org-name');
   }

@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import ConnectAccount from '../components/ConnectAccount';
 import AppNav from './AppNav';
+import { BrandLogo } from './BrandLogo';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { useTranslation } from 'react-i18next';
@@ -45,12 +46,7 @@ const AppLayout: React.FC = () => {
           className="flex items-center gap-2.5 rounded-lg outline-none motion-safe:transition-transform motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-(--accent)/50"
           to="/"
         >
-          <div className="w-8 h-8 rounded-lg grid place-items-center font-extrabold text-black text-sm tracking-tight shadow-[0_0_20px_color-mix(in_srgb,var(--accent)_30%,transparent)] bg-linear-to-br from-(--accent) to-(--accent2)">
-            P
-          </div>
-          <span className="text-lg font-extrabold tracking-tight">
-            Pay<span className="text-(--accent)">D</span>
-          </span>
+          <BrandLogo />
           <span className="text-[9px] font-normal font-mono text-(--muted) tracking-widest uppercase border border-(--border-hi) px-1.5 py-0.5 rounded ml-0.5">
             BETA
           </span>

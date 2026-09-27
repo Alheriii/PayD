@@ -47,14 +47,14 @@ describe('ThemeProvider', () => {
   });
 
   test('restores theme from localStorage on mount', () => {
-    localStorage.setItem('payd-theme', 'light');
+    localStorage.setItem('payd-theme', 'dark');
     render(
       <ThemeProvider>
         <ThemeProbe />
       </ThemeProvider>
     );
-    expect(screen.getByTestId('theme')).toHaveTextContent('light');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    expect(screen.getByTestId('theme')).toHaveTextContent('dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
 
   test('persists theme when toggled', async () => {
@@ -64,11 +64,11 @@ describe('ThemeProvider', () => {
         <ThemeProbe />
       </ThemeProvider>
     );
-    expect(screen.getByTestId('theme')).toHaveTextContent('dark');
-    await user.click(screen.getByRole('button', { name: /toggle/i }));
     expect(screen.getByTestId('theme')).toHaveTextContent('light');
-    expect(localStorage.getItem('payd-theme')).toBe('light');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    await user.click(screen.getByRole('button', { name: /toggle/i }));
+    expect(screen.getByTestId('theme')).toHaveTextContent('dark');
+    expect(localStorage.getItem('payd-theme')).toBe('dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
 
   test('applies and resets white-label brand theme configuration', async () => {
@@ -85,9 +85,25 @@ describe('ThemeProvider', () => {
     expect(document.documentElement.getAttribute('data-org-name')).toBe('Acme Corp');
     expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('#ff0055');
 
+    expect(document.documentElement.style.getPropertyValue('--brand-on-primary')).toBe('#ffffff');
+
     await user.click(screen.getByRole('button', { name: /reset-brand/i }));
     expect(screen.getByTestId('org-name')).toHaveTextContent('none');
     expect(document.documentElement.getAttribute('data-org-name')).toBeNull();
     expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('');
+  });
+
+  test('ignores non-hex brand colours instead of writing them into CSS', () => {
+    localStorage.setItem(
+      'payd-org-brand',
+      JSON.stringify({ primaryColor: 'red; background:url(x)', accentColor: '#14b8a6' })
+    );
+    render(
+      <ThemeProvider>
+        <BrandProbe />
+      </ThemeProvider>
+    );
+    expect(document.documentElement.style.getPropertyValue('--brand-primary')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--brand-accent')).toBe('#14b8a6');
   });
 });

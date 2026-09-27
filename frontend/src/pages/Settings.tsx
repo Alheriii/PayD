@@ -6,6 +6,7 @@ import { useNotification } from '../hooks/useNotification';
 import { clearAllOfflineCaches } from '../services/offlineHistoryCache';
 import { useOnboardingTourStore } from '../stores/onboardingTourStore';
 import ComponentErrorBoundary from '../components/ComponentErrorBoundary';
+import { BrandingSettings } from '../components/BrandingSettings';
 
 /**
  * Each settings section below is its own component (rather than an inline
@@ -56,7 +57,7 @@ function LanguageSettingsSection() {
             onClick={() => handleChangeLanguage(language.code)}
             className={`relative rounded-2xl border p-4 text-left transition ${
               i18n.language === language.code
-                ? 'border-[var(--accent)] bg-[color:rgba(74,240,184,0.08)]'
+                ? 'border-[var(--accent)] bg-[color:color-mix(in_srgb,var(--accent)_8%,transparent)]'
                 : 'border-hi bg-[var(--surface-hi)]/70 hover:border-[var(--accent)]/50'
             }`}
             aria-label={`Select ${language.name}`}
@@ -76,7 +77,7 @@ function LanguageSettingsSection() {
         ))}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[color:rgba(74,240,184,0.22)] bg-[color:rgba(74,240,184,0.08)] p-4">
+      <div className="mt-6 rounded-2xl border border-[color:color-mix(in_srgb,var(--accent)_22%,transparent)] bg-[color:color-mix(in_srgb,var(--accent)_8%,transparent)] p-4">
         <p className="text-xs font-semibold text-[var(--text)]">
           Current Language: {languages.find((l) => l.code === i18n.language)?.nativeName}
         </p>
@@ -136,7 +137,7 @@ function AppearanceSettingsSection() {
             aria-pressed={theme === mode}
             className={`relative rounded-2xl border p-4 text-left transition ${
               theme === mode
-                ? 'border-[var(--accent)] bg-[color:rgba(74,240,184,0.08)]'
+                ? 'border-[var(--accent)] bg-[color:color-mix(in_srgb,var(--accent)_8%,transparent)]'
                 : 'border-hi bg-[var(--surface-hi)]/70 hover:border-[var(--accent)]/50'
             }`}
           >
@@ -306,6 +307,10 @@ export default function Settings() {
 
         <ComponentErrorBoundary componentName="Appearance Settings">
           <AppearanceSettingsSection />
+        </ComponentErrorBoundary>
+
+        <ComponentErrorBoundary componentName="Branding Settings">
+          <BrandingSettings />
         </ComponentErrorBoundary>
 
         <ComponentErrorBoundary componentName="Onboarding Tour Settings">
