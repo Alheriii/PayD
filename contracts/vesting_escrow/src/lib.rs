@@ -651,6 +651,7 @@ impl VestingContract {
     /// what has already been claimed. Requires the clawback admin to authorize.
     pub fn partial_clawback(env: Env, amount: i128) -> Result<(), ContractError> {
         Self::require_not_paused(&env)?;
+        Self::require_unique_ledger(&env, &DataKey::LastClawbackLedger)?;
 
         let mut config: VestingConfig = env
             .storage()

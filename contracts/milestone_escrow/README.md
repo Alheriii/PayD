@@ -33,10 +33,29 @@ Projects and freelance contracts often require releasing payments incrementally 
 | `create_escrow` | `e: Env, sender: Address, beneficiary: Address, verifier: Address, token: Address, milestones: Vec<Milestone>` | `Result<u64, ContractError>` | Sender Auth | Escrows total milestone amounts and creates new escrow record. |
 | `approve_milestone` | `e: Env, escrow_id: u64, milestone_index: u32` | `Result<(), ContractError>` | Verifier Auth | Marks a specific milestone status as `Approved`. |
 | `release_milestone` | `e: Env, escrow_id: u64, milestone_index: u32` | `Result<(), ContractError>` | Beneficiary Auth | Transfers funds for an approved milestone to beneficiary. |
+| `release_milestones_batch` | `e: Env, escrow_id: u64, milestone_indices: Vec<u32>` | `Result<(), ContractError>` | Beneficiary Auth | **[Optimized]** Releases multiple approved milestones in a single transaction, reducing resource costs for escrows with many milestones. |
 | `cancel_escrow` | `e: Env, escrow_id: u64` | `Result<(), ContractError>` | Sender Auth | Deactivates escrow and refunds unreleased funds to sender. |
 | `get_escrow` | `e: Env, escrow_id: u64` | `Result<EscrowRecord, ContractError>` | Public | Reads escrow record by ID. |
 | `get_escrow_count` | `env: Env` | `u64` | Public | Reads total count of created escrows. |
 | `get_releasable_amount` | `e: Env, escrow_id: u64` | `Result<i128, ContractError>` | Public | Calculates sum of all approved but unreleased milestone amounts. |
+
+---
+
+## Resource Optimization
+
+### Issue #1588: Optimized Multi-Milestone Claims
+
+For escrows with many milestones, sequential `release_milestone` calls incur high cumulative storage access fees. The `release_milestones_batch` function enables releasing multiple approved milestones in a single transaction:
+
+- **Single Storage Write**: One `Escrow(escrow_id)` persistent storage update instead of N per-milestone updates.
+- **Single Token Transfer**: One multi-milestone transfer instead of N sequential transfers.
+- **Reduced Ledger Overhead**: Minimizes per-transaction fixed costs for large milestone counts.
+
+**Example Savings**:
+- 10 milestones via `release_milestone`: ~10 storage writes + 10 token transfers
+- 10 milestones via `release_milestones_batch`: ~1 storage write + 1 token transfer
+
+Clients should batch release operations when applicable to minimize resource consumption and transaction costs.
 
 ---
 
@@ -72,6 +91,10 @@ State is persisted using Soroban `Persistent` storage keys.
    - Replay protection keys (`LastApproveLedger`, `LastReleaseLedger`, `LastCancelLedger`) prevent executing duplicate operations within the same ledger.
 4. **Circuit Breaker (`Paused` state)**:
    - When paused, calls to `create_escrow`, `approve_milestone`, `release_milestone`, and `cancel_escrow` are rejected with `ContractPaused`.
+5. **Escrowed-Funds Accounting Invariant**:
+   - The contract guarantees that the token balance held at the contract address strictly equals the sum of unresolved liabilities across all active escrows:
+     $$\text{contract\_token\_balance} = \sum_{i \in \text{active escrows}} (\text{total\_amount}_i - \text{released\_amount}_i)$$
+   - At every lifecycle transition (escrow creation, sequential milestone release, batch release, and sender cancellation), funds are strictly conserved. Completed and cancelled escrows have zero unresolved liability. Validated via property/invariant testing in `test_invariant_escrow_balance_equals_unresolved_liabilities`.
 
 ---
 

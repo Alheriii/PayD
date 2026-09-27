@@ -17,11 +17,13 @@ import {
   Layers,
   Gift,
   HelpCircle,
+  Bell,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Avatar } from './Avatar';
 import { AvatarUpload } from './AvatarUpload';
 import { useWallet } from '../hooks/useWallet';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { formatShortcutKey } from '../utils/keyboardShortcutFormat';
 
 type NavItem = {
@@ -34,20 +36,20 @@ type NavItem = {
 
 const linkClass = (isActive: boolean, variant: 'default' | 'danger' = 'default') =>
   variant === 'danger'
-    ? `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+    ? `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold outline-none motion-safe:transition-[background-color,color,transform] motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] focus-visible:ring-2 focus-visible:ring-(--danger)/50 active:scale-[0.97] ${
         isActive
-          ? 'text-red-500 bg-red-500/10'
-          : 'text-red-400 hover:bg-red-500/20 hover:text-red-500'
+          ? 'text-(--danger) bg-(--danger)/10'
+          : 'text-(--muted) hover:text-(--danger) hover:bg-(--danger)/10'
       }`
-    : `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+    : `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold outline-none motion-safe:transition-[background-color,color,transform] motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] focus-visible:ring-2 focus-visible:ring-(--accent)/50 active:scale-[0.97] ${
         isActive
-          ? 'text-(--accent) bg-white/5'
-          : 'text-(--muted) hover:bg-white/10 hover:text-white'
+          ? 'text-(--accent) bg-(--accent)/10'
+          : 'text-(--muted) hover:bg-(--surface-hi) hover:text-(--text)'
       }`;
 
 const menuItemClass = (isActive: boolean) =>
-  `flex items-center gap-2 px-3 py-2 rounded-md text-[13px] font-medium transition ${
-    isActive ? 'text-(--accent) bg-white/5' : 'text-(--muted) hover:bg-white/10 hover:text-white'
+  `flex items-center gap-2 px-3 py-2 rounded-md text-[13px] font-medium outline-none motion-safe:transition-colors motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] focus-visible:ring-2 focus-visible:ring-(--accent)/50 ${
+    isActive ? 'text-(--accent) bg-(--accent)/10' : 'text-(--muted) hover:bg-(--surface-hi) hover:text-(--text)'
   }`;
 
 // ── Grouped nav dropdown (desktop) ───────
@@ -110,7 +112,7 @@ const NavDropdown: React.FC<NavDropdownProps> = ({
         <div
           role="menu"
           aria-label={label}
-          className="absolute right-0 top-[calc(100%+6px)] min-w-52.5 rounded-xl border p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.35)] z-50"
+          className="absolute right-0 top-[calc(100%+6px)] min-w-52.5 rounded-xl border p-1.5 shadow-(--shadow-lg) z-50 motion-popover"
           style={{ background: 'var(--surface)', borderColor: 'var(--border-hi)' }}
         >
           {items.map((item) => (
@@ -143,6 +145,7 @@ const AppNav: React.FC = () => {
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
   const [userImageUrl, setUserImageUrl] = useState<string | undefined>(undefined);
   const { address, walletName, isConnecting } = useWallet();
+  const prefersReducedMotion = useReducedMotion();
   const closeMobileMenu = () => setMobileOpen(false);
 
   useEffect(() => {
@@ -267,6 +270,8 @@ const AppNav: React.FC = () => {
     },
   ];
 
+  const unreadNotificationCount = 3;
+
   const toolsActive = toolsLinks.some((item) => location.pathname.startsWith(item.to));
   const adminActive = adminLinks.some((item) => location.pathname.startsWith(item.to));
 
@@ -342,7 +347,7 @@ const AppNav: React.FC = () => {
           aria-controls="mobile-navigation-drawer"
           aria-haspopup="dialog"
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden p-2 rounded-md hover:bg-white/5 transition"
+          className="lg:hidden p-2 rounded-md text-(--text) outline-none motion-safe:transition-colors motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] hover:bg-(--surface-hi) focus-visible:ring-2 focus-visible:ring-(--accent)/50 active:scale-95"
         >
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -354,21 +359,45 @@ const AppNav: React.FC = () => {
             aria-label={t('nav.rewards')}
             title={t('nav.rewards')}
             className={({ isActive }) =>
-              `hidden md:grid place-items-center w-8 h-8 rounded-lg transition ${
+              `hidden md:grid place-items-center w-8 h-8 rounded-lg outline-none motion-safe:transition-colors motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] focus-visible:ring-2 focus-visible:ring-(--accent)/50 ${
                 isActive
-                  ? 'text-(--accent) bg-white/5'
-                  : 'text-(--muted) hover:bg-white/10 hover:text-white'
+                  ? 'text-(--accent) bg-(--accent)/10'
+                  : 'text-(--muted) hover:bg-(--surface-hi) hover:text-(--text)'
               }`
             }
           >
             <Gift className="w-4 h-4" />
           </NavLink>
 
+          <NavLink
+            to="/notifications"
+            aria-label={t('nav.unreadNotifications', { count: unreadNotificationCount })}
+            title={t('nav.notifications')}
+            className={({ isActive }) =>
+              `relative hidden md:grid place-items-center w-8 h-8 rounded-lg transition ${
+                isActive
+                  ? 'text-(--accent) bg-white/5'
+                  : 'text-(--muted) hover:bg-white/10 hover:text-white'
+              }`
+            }
+          >
+            <Bell className="w-4 h-4" aria-hidden="true" />
+            {unreadNotificationCount > 0 && (
+              <span
+                className={`motion-notification-badge ${prefersReducedMotion ? 'motion-notification-badge-reduced' : ''}`}
+                aria-hidden="true"
+              >
+                <span className="motion-notification-badge-ping" />
+                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+              </span>
+            )}
+          </NavLink>
+
           <Link
             to="/help"
             aria-label={t('common.help')}
             title={t('nav.searchDocumentationShortcut', { key: formatShortcutKey('k') })}
-            className="hidden md:grid place-items-center w-8 h-8 rounded-lg text-(--accent) hover:bg-(--accent)/10 transition"
+            className="hidden md:grid place-items-center w-8 h-8 rounded-lg text-(--accent) outline-none motion-safe:transition-[background-color,transform] motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] hover:bg-(--accent)/10 active:scale-95 focus-visible:ring-2 focus-visible:ring-(--accent)/50"
           >
             <HelpCircle className="w-4 h-4" />
           </Link>
@@ -387,7 +416,7 @@ const AppNav: React.FC = () => {
           </div>
           <button
             type="button"
-            className="p-1 rounded-lg flex items-center gap-2 cursor-pointer border border-(--border-hi) bg-(--surface) hover:bg-(--surface-hi) transition"
+            className="p-1 rounded-lg flex items-center gap-2 cursor-pointer border border-(--border-hi) bg-(--surface) outline-none motion-safe:transition-[background-color,border-color,transform] motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] hover:bg-(--surface-hi) hover:border-(--accent)/40 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-(--accent)/50"
             onClick={() => setIsProfileEditorOpen(true)}
             aria-label={t('nav.openProfilePictureEditor')}
             title={t('nav.editProfilePhoto')}
@@ -454,12 +483,32 @@ const AppNav: React.FC = () => {
                 {t('nav.rewards')}
               </NavLink>
 
+              <NavLink
+                to="/notifications"
+                aria-label={t('nav.unreadNotifications', { count: unreadNotificationCount })}
+                onClick={closeMobileMenu}
+                className={({ isActive }) => linkClass(isActive)}
+              >
+                <span className="relative" aria-hidden="true">
+                  <Bell className="w-4 h-4" />
+                  {unreadNotificationCount > 0 && (
+                    <span
+                      className={`motion-notification-badge motion-notification-badge-mobile ${prefersReducedMotion ? 'motion-notification-badge-reduced' : ''}`}
+                    >
+                      <span className="motion-notification-badge-ping" />
+                      {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                    </span>
+                  )}
+                </span>
+                {t('nav.notifications')}
+              </NavLink>
+
               <Link
                 to="/help"
                 aria-label={t('common.help')}
                 title={t('nav.searchDocumentationShortcut', { key: formatShortcutKey('k') })}
                 onClick={closeMobileMenu}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition text-(--accent) hover:bg-(--accent)/10"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold outline-none motion-safe:transition-colors motion-safe:duration-(--motion-duration-fast) motion-safe:ease-[var(--motion-ease-out)] focus-visible:ring-2 focus-visible:ring-(--accent)/50 text-(--accent) hover:bg-(--accent)/10"
               >
                 <span aria-hidden="true">
                   <HelpCircle className="w-4 h-4" />
@@ -480,7 +529,7 @@ const AppNav: React.FC = () => {
               <h3 className="text-base font-semibold text-(--text)">{t('nav.profilePicture')}</h3>
               <button
                 type="button"
-                className="rounded p-1 text-(--muted) hover:bg-(--surface-hi)"
+                className="rounded p-1 text-(--muted) outline-none motion-safe:transition-colors motion-safe:duration-(--motion-duration-fast) hover:text-(--text) hover:bg-(--surface-hi) focus-visible:ring-2 focus-visible:ring-(--accent)/50"
                 onClick={() => setIsProfileEditorOpen(false)}
                 aria-label={t('nav.closeProfilePictureEditor')}
               >
@@ -500,7 +549,7 @@ const AppNav: React.FC = () => {
             />
             <button
               type="button"
-              className="mt-4 w-full rounded border border-(--border-hi) px-3 py-2 text-sm text-(--text) hover:bg-(--surface-hi) transition"
+              className="mt-4 w-full rounded border border-(--border-hi) px-3 py-2 text-sm text-(--text) outline-none motion-safe:transition-colors motion-safe:duration-(--motion-duration-fast) hover:bg-(--surface-hi) focus-visible:ring-2 focus-visible:ring-(--accent)/50"
               onClick={() => {
                 setUserImageUrl(undefined);
                 localStorage.removeItem('payd:user-avatar');

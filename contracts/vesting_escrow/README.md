@@ -74,6 +74,45 @@ State is maintained in `Persistent` and `Instance` storage domains.
 
 ---
 
+## Replay-Attack Protection (Issue #1600)
+
+The contract prevents same-ledger replay attacks through a ledger sequence check:
+
+### Protection Mechanism
+- A `LastClaimLedger` and `LastClawbackLedger` key stores the sequence number of the most recent `claim()` or `clawback()` call.
+- Each `claim()`, `clawback()`, or `partial_clawback()` call checks: `if last_ledger == current_ledger { return LedgerReplayDetected }`.
+- If the check passes, the storage key is updated to the current ledger sequence.
+
+### Attack Scenario Prevented
+An attacker cannot submit a claim twice in the same Stellar ledger to receive tokens twice. The second attempt fails with `LedgerReplayDetected`.
+
+### Cross-Ledger Safety
+Operations in different ledgers (e.g., ledger 100 and 101) proceed normally. Only same-ledger duplicates are rejected.
+
+### Test Coverage
+The contract includes comprehensive replay-attack tests:
+- **Same-Ledger Claim Replay**: Verifies that duplicate claims in a single ledger are rejected.
+- **Cross-Ledger Operations**: Confirms that claims in successive ledgers are allowed.
+- **Same-Ledger Clawback Replay**: Ensures clawback operations cannot be replayed within a ledger.
+- **Partial Clawback Replay**: Tests that partial clawback operations are also replay-protected.
+- **Realistic Ledger Sequences**: Tests with Stellar mainnet-realistic sequence numbers (50M+).
+
+---
+
+## Test Coverage for Edge Cases (Issue #1595)
+
+The contract includes comprehensive edge-case tests to verify correct behavior under boundary conditions:
+
+- **Zero-Cliff Immediate Vesting**: Verifies that with `cliff_seconds = 0`, tokens begin vesting immediately after `start_time` (0 at start, > 0 at start+1).
+- **One-Second Cliff**: Tests the minimum non-zero cliff duration to ensure correct linear vesting fraction.
+- **Same-Second Cliff and Duration** (`cliff_seconds == duration_seconds`): Confirms that the entire grant vests at a single instant when cliff equals total duration.
+- **Minimal Duration**: Tests grants with `duration_seconds = 1` to ensure proper vesting calculation under extreme compression.
+- **Boundary Timestamp**: Validates vesting calculations with very large `start_time` values (e.g., `u64::MAX / 2`) to ensure no overflow or precision loss.
+
+These tests ensure robustness before mainnet deployment where financial correctness is critical.
+
+---
+
 ## Security Considerations
 
 1. **Vesting Floor Invariants**:
@@ -84,6 +123,10 @@ State is maintained in `Persistent` and `Instance` storage domains.
    - `require_unique_ledger` checks `LastClaimLedger` and `LastClawbackLedger` to prevent duplicate claims/clawbacks in the same ledger sequence.
 4. **Circuit Breaker (`Paused` state)**:
    - When paused, `claim`, `clawback`, and `partial_clawback` calls return `ContractPaused`.
+5. **Escrowed-Funds Accounting Invariant**:
+   - The contract guarantees that the token balance held at the contract address strictly equals the unresolved liabilities of the grant across every lifecycle event:
+     $$\text{contract\_token\_balance} = \text{config.total\_amount} - \text{config.claimed\_amount}$$
+   - This invariant strictly holds under all execution sequences: during the pre-cliff window, throughout progressive linear claims, across partial clawbacks (with `LastClawbackLedger` replay protection), upon full clawback execution (where unvested tokens return to admin and unreleased-vested tokens remain available for the beneficiary), and upon final resolution where the contract balance reaches exactly 0. Validated via `test_invariant_vesting_balance_equals_unresolved_liabilities`.
 
 ---
 
