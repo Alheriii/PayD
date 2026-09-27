@@ -16,24 +16,45 @@ const { rateLimitService } = await import('./services/rateLimitService.js');
 const { ThrottlingService } = await import('./services/throttlingService.js');
 const { setShuttingDown, waitForInFlightRequests, getInFlightRequests } = await import('./utils/lifecycle.js');
 
-assertJwtSecretsSecure({
-  JWT_SECRET: process.env.JWT_SECRET,
-  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
-});
+async function startServer() {
+  try {
+    // Load secrets from configured provider (env or AWS Secrets Manager)
+    await initializeConfig();
+  } catch (error) {
+    logger.error('Failed to initialize configuration:', error);
+    process.exit(1);
+  }
 
-const server = createServer(app);
+  assertJwtSecretsSecure({
+    JWT_SECRET: process.env.JWT_SECRET,
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+  });
 
-initializeSocket(server);
+  const server = createServer(app);
 
-startWorkers();
+  initializeSocket(server);
 
-const PORT = config.port || process.env.PORT || 4000;
+  startWorkers();
 
-server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  logger.info(`Environment: ${config.nodeEnv}`);
-  logger.info(`Health check: http://localhost:${PORT}/health}`);
-  logger.info(`Contract registry: http://localhost:${PORT}/api/contracts`);
+  const PORT = config.port || process.env.PORT || 4000;
+
+  server.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Environment: ${config.nodeEnv}`);
+    logger.info(`Health check: http://localhost:${PORT}/health}`);
+    logger.info(`Contract registry: http://localhost:${PORT}/api/contracts`);
+  });
+
+  return server;
+}
+
+let server: any;
+
+serverPromise.then((s: any) => {
+  server = s;
+}).catch((error: any) => {
+  logger.error('Failed to start server:', error);
+  process.exit(1);
 });
 
 let shuttingDown = false;
@@ -66,7 +87,7 @@ const shutdown = async (signal: string) => {
         if (err) reject(err);
         else resolve();
       });
-    });
+    }
     logger.info('HTTP server closed', { elapsedMs: Date.now() - shutdownStart });
 
     logger.info('Step 2/7: Waiting for in-flight HTTP requests to finish...', {
